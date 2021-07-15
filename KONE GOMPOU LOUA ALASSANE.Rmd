@@ -1,0 +1,290 @@
+---
+title: "EXAMEN DE CLUSTERING SESSION 1"
+author: "MASTER 2 DATA-SCIENCE (INP-HB Côte D’Ivoire)<br> Présentateur: KONE GOMPOU LOUA ALASSANE <br> Professeur: M.Monsan Vincent"
+date: " Date du jour : `r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# EXERCICE 3
+#IMPORTATION DES LIBRAIRIE
+```{r}
+library(dplyr)
+library(FactoMineR)
+library(ggplot2)
+library(factoextra)
+library(Hmisc)
+library(corrplot)
+
+library(rmdformats)
+```
+
+# 1.Importation du fichier <<fromage.txt>>
+```{r}
+#Chargement des données
+fromage <- read.table(file="fromage.txt",header=T,row.names=1,sep="\t",dec=".")
+
+```
+
+
+
+```{r}
+#Affichage des 6 premieres lignes
+print(head(fromage))
+
+```
+
+
+
+```{r}
+#Statistiques descriptives
+print(summary(fromage))
+
+```
+
+
+```{r}
+
+#Graphique de croisement 2 à deux
+pairs(fromage)
+```
+\n
+## Ce type de graphique n’est jamais anodin. Nous constatons par exemple que (1) «lipides» est fortement corrélé avec «calories» et «cholestérol».\n Ensuite (2) dans certaines configurations, des groupes semblent apparaître naturellement par exemple le croisement de «protéines» et «cholestérol», avec une corrélation inter-groupesassez marquée.`
+
+# 2.Pensez-vous qu'il faut reduire les données avant la classification
+
+## Pour éviter que variables à forte variance pèsent indûment sur les résultat, justement nous devons bien passer au centrage et à la réductionde nos données avant la classification.
+
+```{r}
+#Centrage et reduction des données
+fromage_centre_reduit <-scale(fromage,center = T,scale = T)
+```
+
+```{r}
+#Matrice des distance entre individus 
+distance.fromage <- dist(fromage_centre_reduit)
+```
+
+# 3.Classification hiérarchique par la méthode de Ward de nos données réduites
+```{r}
+#CAH - CRitère de Ward
+#Méthode = <<Ward.D2>> correspondant au vrai critère de Ward utilisant les carrés de la distance
+cah.ward <- hclust(distance.fromage, method = "ward.D2")
+```
+
+
+# 4.Representation graphique du dendrogramme et choix du nombre k de classes
+```{r}
+#Affichage du dendrogramme
+plot(cah.ward)
+```
+\n
+## Le dendrogramme «suggère» un découpage en 4 groupes. On note qu’une classe de fromages, les «fromages frais» (tout à gauche), se démarque fortement ## des autres au point qu’on aurait pu envisager aussi un découpage en 2 groupes seulement.
+
+
+
+
+
+
+```{r}
+#découpage en 4 groupes
+groupes.cah <-cutree(cah.ward,k=4)
+
+```
+
+
+```{r}
+#liste des groupes
+print(sort(groupes.cah))
+```
+\n
+## Le 4ème groupe est constitué de fromages frais.\n Le 3èmede fromages à pâte molle. \n Le 2ndde fromages  «durs».\n Le 1er est un peu fourre-tout (de mon point de vue). \n Pour une caractérisation à l’aide des variables de l’étude, il faut passer par des techniques statistiques univariées (simples à  lire) ou multivariées(tenant compte des relations entre les variables)
+
+\n\n \n \n
+# 5.Interpretation des partition avec une ACP et confirmation de l'interpretation avec la fonction R <<catdes()>>
+
+## Avec l’ACP, nous tenons compte des liaisons entre les variables. \n L’analyse est plus riche. Mais il faut savoir lire correctement les sorties de l’ACP.
+
+```{r}
+#ACP normée
+acp<-princomp(fromage,cor=T,scores=T)
+
+```
+
+```{r}
+#screeplot-2 axes retenus
+plot(1:9,acp$sdev^2,type="b",xlab="Nb. de facteurs",ylab="Val. Propres")
+
+```
+
+```{r}
+#biplot
+biplot(acp,cex=0.65)
+```
+\n
+# Il y a un problème. Le groupe des fromages fraisécrase l’information disponible et tasse les autres fromages dans un bloc qui s’oriente différemment.
+
+## De fait, si l’on comprend bien la nature du groupe 4 des fromages frais, les autres sont plus compliqués à comprendre lorsqu’ils sont replacés dans le premier plan factoriel.
+
+
+
+
+
+```{r}
+#positionnement des groupes dans le plan factoriel avec étiquettes des points
+plot(acp$scores[,1],acp$scores[,2],type="n",xlim=c(-5,5),ylim=c(-5,5))
+text(acp$scores[,1],acp$scores[,2],col=c("red","green","blue","black")[groupes.cah],cex=0.65,labels=rownames(fromage),xlim=c(-5,5),ylim=c(-5,5))
+```
+\n
+## Pour les groupes 1, 2 et 3 (vert, rouge, bleu), on perçoit à partir du graphique biplotde la page précédente qu’il y a quelque chose autour de l’opposition entre nutriments (lipides/calories/cholestérol, protéines, magnésium, calcium) et vitamines (rétinol, folates).\n Mais, dans quel sens exactement ? La lecture n’est pas facile du fait de l’effet perturbateur du groupe 4.
+
+
+
+\n
+# Pour méner à bien notre analyse, il serait plus judicieux de se passer de certaines observations 
+## Les fromages frais sont tellement particuliers éloignés de l’ensemble des autres observations qu’ils masquent des relations intéressantes qui peuvent exister entre ces produits. Nous reprenons l’analyse en les excluant des traitements.
+```{r}
+#retirer les 4 obs. du groupe 4
+fromage.subset<-fromage[groupes.cah!=4,]
+
+```
+
+```{r}
+#centrage réduction
+fromage.subset.cr <-scale(fromage.subset,center=T,scale=T)
+
+```
+
+```{r}
+#matrice de 
+distanced.subset<-dist(fromage.subset.cr)
+
+```
+
+
+```{r}
+#cah2
+cah.subset<-hclust(distanced.subset,method="ward.D2")
+
+```
+
+```{r}
+#affichage
+plot(cah.subset)
+
+```
+\n
+## 3 groupes se distinguent. On a moins le phénomène d’écrasement constaté dans l’analyse précédente
+
+
+
+
+```{r}
+#groupes
+groupes.subset<-cutree(cah.subset,k=3)
+
+```
+
+
+```{r}
+#affichage des groupes
+print(sort(groupes.subset))
+
+```
+
+
+```{r}
+#acp
+acp.subset<-princomp(fromage.subset,cor=T,scores=T)
+
+```
+
+```{r}
+#screeplot-2 axes retenus
+plot(1:9,acp.subset$sdev^2,type="b")
+
+```
+
+```{r}
+#biplot
+biplot(acp.subset,cex=0.65)
+
+```
+\n
+## Les résultats ne contredisent pas l’analyse précédente.  Mais les concomitances et oppositions apparaissent plus clairement, notamment sur le 1er  facteur.Le positionnement de folatesest plus explicite.On peut aussi s’interroger sur l’intérêt de conserver 3 variables qui portent la même information dans l’analyse (lipides, cholestérol et calories).
+
+
+
+```{r}
+#positionnement des groupes dans le plan factoriel
+plot(acp.subset$scores[,1],acp.subset$scores[,2],type="n",xlim=c(-6,6),ylim=c(-6,6))
+#etiquettesdes points
+text(acp.subset$scores[,1],acp.subset$scores[,2],col=c("red","green","blue")[groupes.subset],cex=0.65,labels=rownames(fromage.subset),xlim=c(-6,6),ylim=c(-6,6))
+```
+\n
+## Les groupes sont constitués essentiellement sur le 1erfacteur. Quelques fromages ont changé de camp par rapport à l’analyse précédente : carré de l’est et coulommiers d’une part ; cheddar d’autre part.
+
+
+# 6.Faisons un k-means en faisant varier le nombre de groupe et proposition du nombre de classe
+```{r}
+#k-means avec mes données centrées reduites
+#center = 4 -nombre de groupes demandés
+#nstart= 5 -nombre d'essais avec différents individus de départ
+#parce que les résultats sont dépendants de l’initialisation
+groupes.kmeans<-kmeans(fromage_centre_reduit,centers=4,nstart=5)
+
+```
+
+```{r}
+#affichage des résultats
+print(groupes.kmeans)
+
+```
+## On observe dans cette sortie R:\n les Effectifs des classes, \n les Moyennes des variables actives (centrées et réduites) conditionnellement à l’appartenance aux groupes.\n les groupe d’affectation des individus la proportion d’inertie expliquée par la partition : 72%
+
+```{r}
+#correspondance avec les groupes de la CAH
+print(table(groupes.cah,groupes.kmeans$cluster))
+```
+
+## Cette sortie  resulte de la correspondance CAH –K-Means
+### Le groupe 4 de la CAH coïncide avec le groupe 1 des K-Means. Après, il y a certes des correspondances, mais elles ne sont ## pas exactes.Remarque 
+
+
+# METHODE DES CENTRES MOBILES
+```{r}
+#(1)évaluer la proportion d'inertie expliquée
+inertie.expl<-rep(0,times=10)
+for (k in 2:10){clus<-kmeans(fromage_centre_reduit,centers=k,nstart=5)  
+inertie.expl[k] <-clus$betweenss/clus$totss}
+
+```
+
+
+```{r}
+#graphique
+plot(1:10,inertie.expl,type="b",xlab="Nb. de groupes",ylab="% inertie expliquée")
+
+```
+##  A partir de k = 4 classes, l’adjonction d’un groupe supplémentaire n’augmente pas «significativement» la part d’inertie expliquée par la partition.
+
+```{r}
+#(2) indice de CalinskiHarabasz-utilisation du package fpclibrary(fpc)
+#évaluation des solutions
+
+library(fpc)
+sol.kmeans<-kmeansruns(fromage_centre_reduit,krange=2:10,criterion="ch")
+#graphique
+plot(1:10,sol.kmeans$crit,type="b",xlab="Nb. de groupes",ylab="Silhouette")
+```
+
+## La solution k = 4 classes maximise (de peu face à k = 2, k = 3 et k = 5) l’indice
+
+
+
